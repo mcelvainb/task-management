@@ -51,21 +51,21 @@ export class AuthService {
 
     // Assign Owner role to first user in org, Admin role to others
     const ownerRole = await this.roleRepository.findOne({ where: { name: RoleType.OWNER } });
-    console.log('ownerRole: ' + ownerRole?.name);
     const adminRole = await this.roleRepository.findOne({ where: { name: RoleType.ADMIN } });
-    console.log('adminRole: ' + adminRole?.name);
     const userCount = await this.userRepository.count({ where: { organization: { id: organization.id } }, });
-    console.log('userCount in org: ' + userCount);
     const roleToAssign = userCount === 1 ? ownerRole : adminRole;
-    console.log('roleToAssign: ' + roleToAssign?.name);
     if (roleToAssign) {
       const userRole = this.userRoleRepository.create({ 
         user, 
         role: roleToAssign 
       });
       await this.userRoleRepository.save(userRole);
+      
+      // Reload user to populate roles
+      const updatedUser = await this.userRepository.findOne({ where: { id: user.id } });
+      return this.generateToken(updatedUser);
     }
-    console.log('userRole assigned' + roleToAssign?.name);
+    
     return this.generateToken(user);
   }
 
@@ -84,25 +84,25 @@ export class AuthService {
   }
 
   private generateToken(user: User) {
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      orgId: user.organization.id,
-      roles: user.roles.map(ur => ur.role.name),
-    };
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    orgId: user.organization.id,
+    roles: user.roles?.map(ur => ur.role.name) || [],
+  };
 
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        organization: user.organization,
-        roles: user.roles.map(ur => ur.role.name),
-      },
-    };
-  }
+  return {
+    access_token: this.jwtService.sign(payload),
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      organization: user.organization,
+      roles: user.roles?.map(ur => ur.role.name) || [],
+    },
+  };
+}
 
   async validateUser(userId: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { id: userId } });
