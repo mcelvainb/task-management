@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { User, Organization, Role, UserRole, Task, AuditLog } from '../entities/index.entity';
+import { TaskModule } from '../tasks/task.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { User, Organization, Role, UserRole, Task, AuditLog } from '../entities/
 
     TypeOrmModule.forFeature([User, Organization, Role, UserRole, Task, AuditLog]),
     AuthModule,
+    TaskModule,
   ],
 })
 export class AppModule {}
