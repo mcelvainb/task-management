@@ -1,9 +1,9 @@
-// apps/dashboard/src/app/tasks/task-dashboard.component.ts
-import { Component, signal, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task } from '../services/task.service';
 import { AuthService } from '../services/auth.service';
+import { toSignal } from '@angular/core/rxjs-interop';
 
 type FilterType = 'all' | 'work' | 'personal' | 'completed';
 
@@ -14,9 +14,13 @@ type FilterType = 'all' | 'work' | 'personal' | 'completed';
   templateUrl: './task-dashboard.component.html',
   styleUrls: ['./task-dashboard.component.css'],
 })
-export class TaskDashboardComponent {
+export class TaskDashboardComponent implements OnInit {
   private taskService = inject(TaskService);
   private authService = inject(AuthService);
+
+  ngOnInit(): void {
+    this.taskService.loadTasks().subscribe();
+  }
 
   tasks$ = this.taskService.tasks$;
   filter = signal<FilterType>('all');
@@ -24,11 +28,11 @@ export class TaskDashboardComponent {
   newCategory = 'work';
   filters: FilterType[] = ['all', 'work', 'personal', 'completed'];
   statuses: Task['status'][] = ['todo', 'in_progress', 'done'];
+  tasksSignal = toSignal(this.taskService.tasks$, { initialValue: [] });
 
   filteredTasks = computed(() => {
-    const tasks = (this.tasks$ as any)._value || [];
+    const tasks = this.tasksSignal();
     const f = this.filter();
-
     return tasks.filter((t: Task) => {
       if (f === 'all') return true;
       if (f === 'work') return t.category === 'work';
@@ -39,28 +43,32 @@ export class TaskDashboardComponent {
   });
 
   completedCount = computed(() => {
-    const tasks = (this.tasks$ as any)._value || [];
+    const tasks = this.tasksSignal();
     return tasks.filter((t: Task) => t.status === 'done').length;
   });
 
   inProgressCount = computed(() => {
-    const tasks = (this.tasks$ as any)._value || [];
+    const tasks = this.tasksSignal();
     return tasks.filter((t: Task) => t.status === 'in_progress').length;
   });
 
   addTask(): void {
     if (this.newTask.trim()) {
-      this.taskService.addTask(this.newTask, this.newCategory);
-      this.newTask = '';
+      this.taskService.addTask(this.newTask, this.newCategory).subscribe({
+        next: () => {
+          this.newTask = '';
+        },
+        error: (err) => console.error('Failed to add task:', err),
+      });
     }
   }
 
-  updateTaskStatus(id: number, status: Task['status']): void {
-    this.taskService.updateTaskStatus(id, status);
+  updateTaskStatus(id: string, status: Task['status']): void {
+    this.taskService.updateTaskStatus(id, status).subscribe();
   }
 
-  deleteTask(id: number): void {
-    this.taskService.deleteTask(id);
+  deleteTask(id: string): void {
+    this.taskService.deleteTask(id).subscribe();
   }
 
   logout(): void {

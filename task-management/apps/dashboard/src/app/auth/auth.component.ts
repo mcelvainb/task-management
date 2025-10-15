@@ -18,18 +18,29 @@ export class AuthComponent {
   firstName = '';
   lastName = '';
   orgName = '';
+  error = '';
+  loading = false;
 
   constructor(private authService: AuthService) {}
 
   toggleFormMode(): void {
     this.formMode.set(this.formMode() === 'login' ? 'register' : 'login');
+    this.error = '';
   }
 
   handleLogin(): void {
+    this.error = '';
+    this.loading = true;
+
     if (this.formMode() === 'login' && this.email && this.password) {
-      this.authService.login('mock-token', {
-        email: this.email,
-        firstName: 'John',
+      this.authService.loginApi(this.email, this.password).subscribe({
+        next: () => {
+          this.loading = false;
+        },
+        error: (err) => {
+          this.error = err.error?.message || 'Login failed';
+          this.loading = false;
+        },
       });
     } else if (
       this.formMode() === 'register' &&
@@ -39,11 +50,20 @@ export class AuthComponent {
       this.lastName &&
       this.orgName
     ) {
-      this.authService.login('mock-token', {
-        email: this.email,
-        firstName: this.firstName,
-        lastName: this.lastName,
-        organization: this.orgName,
+      this.authService.register(
+        this.email,
+        this.password,
+        this.firstName,
+        this.lastName,
+        this.orgName
+      ).subscribe({
+        next: () => {
+          this.loading = false;
+        },
+        error: (err) => {
+          this.error = err.error?.message || 'Registration failed';
+          this.loading = false;
+        },
       });
     }
   }

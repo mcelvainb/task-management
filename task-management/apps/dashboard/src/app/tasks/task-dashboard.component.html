@@ -78,10 +78,8 @@
                       >
                         {{ task.category }}
                       </span>
-                      <span
-                        class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600"
-                      >
-                        {{ task.createdAt }}
+                     <span class="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">
+                        {{ task.createdAt | date: 'short' }}
                       </span>
                     </div>
                   </div>

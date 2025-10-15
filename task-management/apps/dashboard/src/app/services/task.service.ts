@@ -1,8 +1,10 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+// apps/dashboard/src/app/services/task.service.ts
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
 
 export interface Task {
-  id: number;
+  id: string;
   title: string;
   description?: string;
   status: 'todo' | 'in_progress' | 'done';
@@ -14,53 +16,47 @@ export interface Task {
   providedIn: 'root',
 })
 export class TaskService {
-  private tasksSubject = new BehaviorSubject<Task[]>([
-    {
-      id: 1,
-      title: 'Design login page',
-      status: 'done',
-      category: 'work',
-      createdAt: '2025-01-10',
-    },
-    {
-      id: 2,
-      title: 'Buy groceries',
-      status: 'todo',
-      category: 'personal',
-      createdAt: '2025-01-11',
-    },
-    {
-      id: 3,
-      title: 'Review PR',
-      status: 'in_progress',
-      category: 'work',
-      createdAt: '2025-01-11',
-    },
-  ]);
-
+  private http = inject(HttpClient);
+  private apiUrl = 'http://localhost:3000/tasks';
+  
+  private tasksSubject = new BehaviorSubject<Task[]>([]);
   tasks$ = this.tasksSubject.asObservable();
 
-  addTask(title: string, category: string): void {
-    const tasks = this.tasksSubject.value;
-    const newTask: Task = {
-      id: Math.max(...tasks.map(t => t.id), 0) + 1,
-      title,
-      status: 'todo',
-      category: category as any,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    this.tasksSubject.next([...tasks, newTask]);
-  }
-
-  updateTaskStatus(id: number, status: Task['status']): void {
-    const tasks = this.tasksSubject.value.map(t =>
-      t.id === id ? { ...t, status } : t
+  loadTasks(): Observable<Task[]> {
+    return this.http.get<Task[]>(this.apiUrl).pipe(
+      tap((tasks) => this.tasksSubject.next(tasks))
     );
-    this.tasksSubject.next(tasks);
   }
 
-  deleteTask(id: number): void {
-    const tasks = this.tasksSubject.value.filter(t => t.id !== id);
-    this.tasksSubject.next(tasks);
+  addTask(title: string, category: string): Observable<Task> {
+    return this.http.post<Task>(this.apiUrl, {
+      title,
+      category,
+    }).pipe(
+      tap((task) => {
+        const tasks = this.tasksSubject.value;
+        this.tasksSubject.next([...tasks, task]);
+      })
+    );
+  }
+
+  updateTaskStatus(id: string, status: Task['status']): Observable<Task> {
+    return this.http.put<Task>(`${this.apiUrl}/${id}`, { status }).pipe(
+      tap((updatedTask) => {
+        const tasks = this.tasksSubject.value.map(t =>
+          t.id === id ? updatedTask : t
+        );
+        this.tasksSubject.next(tasks);
+      })
+    );
+  }
+
+  deleteTask(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(
+      tap(() => {
+        const tasks = this.tasksSubject.value.filter(t => t.id !== id);
+        this.tasksSubject.next(tasks);
+      })
+    );
   }
 }

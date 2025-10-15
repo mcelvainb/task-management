@@ -1,3 +1,4 @@
+// apps/api/src/main.ts
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
@@ -7,6 +8,13 @@ import { seedRoles } from './database/seeders/seed-roles';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // Enable CORS
+  app.enableCors({
+    origin: 'http://localhost:4200', // Your Angular dev server
+    credentials: true,
+  });
+  
   app.useGlobalPipes(new ValidationPipe());
   
   // Seed roles on startup
