@@ -1,0 +1,33 @@
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div class="flex items-start gap-3">
+        <div class="flex-shrink-0">
+          <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            {{ getInitials() }}
+          </div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-900">
+            {{ user?.firstName }} {{ user?.lastName }}
+          </p>
+          <p class="text-sm text-gray-600">{{ user?.email }}</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              {{ user?.organization?.name || 'No Organization' }}
+            </span>
+            @for (role of user?.roles; track role) {
+              <span 
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                [class.bg-red-100]="role === 'owner'"
+                [class.text-red-800]="role === 'owner'"
+                [class.bg-blue-100]="role === 'admin'"
+                [class.text-blue-800]="role === 'admin'"
+                [class.bg-green-100]="role === 'viewer'"
+                [class.text-green-800]="role === 'viewer'"
+              >
+                {{ role }}
+              </span>
+            }
+          </div>
+        </div>
+      </div>
+    </div>

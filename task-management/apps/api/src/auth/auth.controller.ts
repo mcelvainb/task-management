@@ -1,6 +1,8 @@
-import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
+// apps/api/src/auth/auth.controller.ts
+import { Controller, Post, Body, UseGuards, Get, Request, Put, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RoleType } from '../entities/role.entity';
 
 export class RegisterDto {
   email: string;
@@ -13,6 +15,11 @@ export class RegisterDto {
 export class LoginDto {
   email: string;
   password: string;
+}
+
+export class ChangeRoleDto {
+  userId: string;
+  roleName: RoleType;
 }
 
 @Controller('auth')
@@ -39,5 +46,21 @@ export class AuthController {
   @Get('me')
   getCurrentUser(@Request() req: { user: any }) {
     return req.user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('users/:userId/role')
+  async changeUserRole(
+    @Request() req: { user: any },
+    @Param('userId') userId: string,
+    @Body() body: ChangeRoleDto,
+  ) {
+    return this.authService.changeUserRole(req.user.user, userId, body.roleName);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('users')
+  async getOrganizationUsers(@Request() req: { user: any }) {
+    return this.authService.getOrganizationUsers(req.user.user);
   }
 }

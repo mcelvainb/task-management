@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -7,6 +7,7 @@ import { User } from '../entities/user.entity';
 import { Organization } from '../entities/organization.entity';
 import { Role, RoleType } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
+
 
 @Injectable()
 export class AuthService {
@@ -107,4 +108,72 @@ export class AuthService {
   async validateUser(userId: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { id: userId } });
   }
+
+    async changeUserRole(currentUser: User, targetUserId: string, newRole: RoleType) {
+    // Check if current user is owner or admin
+    const isOwner = currentUser.roles.some(ur => ur.role.name === RoleType.OWNER);
+    const isAdmin = currentUser.roles.some(ur => ur.role.name === RoleType.ADMIN);
+
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('Only owners and admins can change user roles');
+    }
+
+    // Admins can only assign viewer role, owners can assign any role
+    if (isAdmin && !isOwner && newRole !== RoleType.VIEWER) {
+      throw new ForbiddenException('Admins can only assign viewer role');
+    }
+
+    // Get target user
+    const targetUser = await this.userRepository.findOne({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Check if users are in the same organization
+    if (targetUser.organization.id !== currentUser.organization.id) {
+      throw new ForbiddenException('You can only change roles for users in your organization');
+    }
+
+    // Don't allow changing your own role
+    if (targetUser.id === currentUser.id) {
+      throw new ForbiddenException('You cannot change your own role');
+    }
+
+    // Get the new role
+    const role = await this.roleRepository.findOne({ where: { name: newRole } });
+    if (!role) {
+      throw new BadRequestException('Invalid role');
+    }
+
+    // Remove existing roles
+    await this.userRoleRepository.delete({ user: { id: targetUserId } });
+
+    // Assign new role
+    const userRole = this.userRoleRepository.create({
+      user: targetUser,
+      role,
+    });
+    await this.userRoleRepository.save(userRole);
+
+    return { message: 'Role updated successfully', user: targetUser };
+  }
+
+  async getOrganizationUsers(currentUser: User) {
+    const users = await this.userRepository.find({
+      where: { organization: { id: currentUser.organization.id } },
+      relations: ['roles', 'roles.role'],
+    });
+
+    return users.map(user => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roles: user.roles?.map(ur => ur.role.name) || [],
+    }));
+  }
+
 }

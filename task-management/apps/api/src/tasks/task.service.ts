@@ -44,20 +44,39 @@ export class TaskService {
     // Log the action
     await this.logAudit(user, AuditAction.CREATE, 'Task', savedTask.id, `Created task: ${dto.title}`);
 
-    return savedTask;
+    // Return with cleaned creator info
+    return {
+      ...savedTask,
+      creator: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      },
+    } as any;
   }
 
   async getTasks(user: User): Promise<Task[]> {
     const tasks = await this.taskRepository.find({
       where: { organization: { id: user.organization.id } },
-      relations: ['creator'],
+      relations: ['creator', 'creator.organization'], // Make sure creator is loaded
     });
 
     // Log read access
     await this.logAudit(user, AuditAction.READ, 'Task', null, `Retrieved ${tasks.length} tasks`);
 
-    return tasks;
+    // Clean up the response to not include passwords
+    return tasks.map(task => ({
+      ...task,
+      creator: task.creator ? {
+        id: task.creator.id,
+        firstName: task.creator.firstName,
+        lastName: task.creator.lastName,
+        email: task.creator.email,
+      } : undefined,
+    })) as any;
   }
+
 
   async getTaskById(user: User, taskId: string): Promise<Task> {
     const task = await this.taskRepository.findOne({
@@ -77,6 +96,7 @@ export class TaskService {
   async updateTask(user: User, taskId: string, dto: UpdateTaskDto): Promise<Task> {
     const task = await this.taskRepository.findOne({
       where: { id: taskId, organization: { id: user.organization.id } },
+      relations: ['creator'],
     });
 
     if (!task) {
@@ -97,30 +117,40 @@ export class TaskService {
 
     await this.logAudit(user, AuditAction.UPDATE, 'Task', taskId, `Updated task: ${task.title}`);
 
-    return updatedTask;
+    // Return with cleaned creator info
+    return {
+      ...updatedTask,
+      creator: task.creator ? {
+        id: task.creator.id,
+        firstName: task.creator.firstName,
+        lastName: task.creator.lastName,
+        email: task.creator.email,
+      } : undefined,
+    } as any;
   }
 
   async deleteTask(user: User, taskId: string): Promise<void> {
-    const task = await this.taskRepository.findOne({
-      where: { id: taskId, organization: { id: user.organization.id } },
-    });
+  const task = await this.taskRepository.findOne({
+    where: { id: taskId, organization: { id: user.organization.id } },
+  });
 
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
-
-    // Check permissions: only creator, admin, or owner can delete
-    const isCreator = task.creator.id === user.id;
-    const isAdminOrOwner = user.roles.some(ur => ur.role.name === 'admin' || ur.role.name === 'owner');
-
-    if (!isCreator && !isAdminOrOwner) {
-      throw new ForbiddenException('You can only delete your own tasks');
-    }
-
-    await this.taskRepository.remove(task);
-
-    await this.logAudit(user, AuditAction.DELETE, 'Task', taskId, `Deleted task: ${task.title}`);
+  if (!task) {
+    throw new NotFoundException('Task not found');
   }
+
+  // Check permissions: only creator or owner can delete (NOT admin)
+  const isCreator = task.creator.id === user.id;
+  const isOwner = user.roles.some(ur => ur.role.name === 'owner');
+
+  if (!isCreator && !isOwner) {
+    throw new ForbiddenException('You can only delete your own tasks or you must be an owner');
+  }
+
+  await this.taskRepository.remove(task);
+
+  await this.logAudit(user, AuditAction.DELETE, 'Task', taskId, `Deleted task: ${task.title}`);
+}
+
 
   private async logAudit(
     user: User,

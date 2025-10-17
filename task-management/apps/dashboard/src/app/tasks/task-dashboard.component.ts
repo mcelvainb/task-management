@@ -3,20 +3,25 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TaskService, Task } from '../services/task.service';
 import { AuthService } from '../services/auth.service';
+import { UserInfoComponent } from '../components/user-info.component';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { UserManagementComponent } from '../components/user-management.component';
 
 type FilterType = 'all' | 'work' | 'personal' | 'completed';
 
 @Component({
   selector: 'app-task-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UserInfoComponent, UserManagementComponent],
   templateUrl: './task-dashboard.component.html',
   styleUrls: ['./task-dashboard.component.css'],
 })
+
 export class TaskDashboardComponent implements OnInit {
   private taskService = inject(TaskService);
   private authService = inject(AuthService);
+  
+  currentUser = this.authService.getUser();
 
   ngOnInit(): void {
     this.taskService.loadTasks().subscribe();
@@ -51,6 +56,22 @@ export class TaskDashboardComponent implements OnInit {
     const tasks = this.tasksSignal();
     return tasks.filter((t: Task) => t.status === 'in_progress').length;
   });
+
+  get canManageUsers(): boolean {
+    const user = this.currentUser;
+    return user?.roles?.includes('owner');
+  }
+
+  canDeleteTask(task: Task): boolean {
+    const user = this.currentUser;
+    if (!user || !task.creator) return false;
+    
+    const isCreator = task.creator.id === user.id;
+    const isOwner = user.roles?.includes('owner');
+    
+    return isCreator || isOwner;
+  }
+  
 
   addTask(): void {
     if (this.newTask.trim()) {

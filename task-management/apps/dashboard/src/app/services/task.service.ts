@@ -10,6 +10,12 @@ export interface Task {
   status: 'todo' | 'in_progress' | 'done';
   category: 'work' | 'personal' | 'other';
   createdAt: string;
+  creator?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 @Injectable({
